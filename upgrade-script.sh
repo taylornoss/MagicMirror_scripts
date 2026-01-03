@@ -15,14 +15,14 @@ git_active_lock='./.git/index.lock'
 lf=$'\n'
 git_user_name=
 git_user_email=
-NODE_TESTED="v22.18.0" #"v20.18.1" # "v16.13.0"
+NODE_TESTED="v22.21.1" #"v20.18.1" # "v16.13.0"
 if [ "$testmode." != "." ];  then
-	NODE_TESTED="v22.18.0"
+	NODE_TESTED="v22.21.1"
 fi
-NPM_TESTED="V10.9.2" #"V10.8.2" # "V7.11.2"
+NPM_TESTED="V10.9.4" #"V10.8.2" # "V7.11.2"
 NODE_STABLE_BRANCH="${NODE_TESTED:1:2}.x"
 BAD_NODE_VERSION=21
-NODE_ACCEPTABLE=V22.9.0
+NODE_ACCEPTABLE=V22.21.1
 NODE_INSTALL=false
 known_list="request valid-url jsdom node-fetch digest-fetch"
 JustProd="--only=prod"
@@ -34,6 +34,36 @@ repo=master
 if [ "${testmode}." != "." ]; then
 	repo=develop
 fi
+
+get_nvm_command(){
+	if [ "$NVM_DIR." != "." -a -d $NVM_DIR ]; then
+		# nvm is installed, use it
+		# the lines after 'EOF' thru EOF MUST be on the start of the line
+read -r -d '' multiline_string << EOF
+export NVM_DIR=$NVM_DIR;
+. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh";
+axx=
+if [ "$3." != "." ]; then
+	axx=":32"
+fi
+nvm install $1$axx
+nvm uninstall $2
+EOF
+		echo "$multiline_string"
+	else
+	   # check if n is isntalled
+	   if [ "$(which n)." == "." ]; then
+	     sudo npm i n -g  >>$logfile 2>&1
+	   fi
+	   axx=
+	   if [ "$3." != "." ]; then
+	   	axx="--arch ${3:1}"
+	   fi
+	   echo "sudo n $axx $1 "
+	fi
+	echo ""
+}
 
 getRequiredNodeVersion() {
 	engine=$(echo "$package_json" | grep \"engines\" -A 2  | grep $1 | awk -F: '{print $2}' | tr -d \")
@@ -123,6 +153,9 @@ if [ -d ~/$mfn ]; then
 	# if the script was execute from the web
 	#if [[ $logdir != *"MagicMirror/installers"* ]]; then
 		# use the MagicMirror/installers folder
+		if [ ! -d ~/$mfn/installers ]; then
+			mkdir ~/$mfn/installers
+		fi
 		cd ~/$mfn/installers >/dev/null
 		logdir=$(pwd)
 		cd - >/dev/null
@@ -251,19 +284,22 @@ if [ -d ~/$mfn ]; then
 				NODE_MAJOR=22
 				# if n is not installed
 				if [ $doinstalls == $true ]; then
-					if [ "$(which n)." == "." ]; then
+					NODE_CURRENT=$(node -v 2>/dev/null)
+					if [ "$NODE_CURRENT." == "." ]; then
+			            NODE_CURRENT="V1.0.0"
+		                echo forcing low Node version  >> $logfile
+			        fi
+					nvm_command=$(get_nvm_command "$NODE_TESTED" "$NODE_CURRENT" "$ar")
+				    #echo using $nvm_command
+					#if [ "$(which n)." == "." ]; then
 						# install it globally
-						echo installing n globally
-						sudo npm i n -g  >>$logfile 2>&1
-					fi
+					#	echo installing n globally
+					#	sudo npm i n -g  >>$logfile 2>&1
+					#fi
 					# if n is installed
-					if [ "$(which n)." != "." ]; then						
+					#if [ "$(which n)." != "." ]; then
 						# use it to upgrade node
-						NODE_CURRENT=$(node -v 2>/dev/null)
-						if [ "$NODE_CURRENT." == "." ]; then
-				            NODE_CURRENT="V1.0.0"
-			                echo forcing low Node version  >> $logfile
-				        fi
+
 						echo -e "\e[0mNode currently installed. Checking version number.\e[0m" | tee -a $logfile
 				                echo -e "\e[0mMinimum Node version: \e[1m$NODE_TESTED\e[0m" | tee -a $logfile
 				                echo -e "\e[0mInstalled Node version: \e[1m$NODE_CURRENT\e[0m" | tee -a $logfile
@@ -278,15 +314,17 @@ if [ -d ~/$mfn ]; then
 								ar="--arch armv7l"
 							fi
 							echo -e "\e[96minstalling correct version of node and npm, please wait\e[0m" | tee -a $logfile
-							sudo n $NODE_TESTED $ar >>$logfile
+							#echo using $nvm_command
+							eval "$nvm_command" >>$logfile
+							hash -r
 							PATH=$PATH
 							NODE_INSTALL=false
 						fi
-					fi
-				else
-					if [ "$(which n)." == "." ]; then
-						echo "n (node version manager tool) not installed, doing test run, install skipped" >>$logfile
-					fi
+					#fi
+				#else
+				#	if [ "$(which n)." == "." ]; then
+				#		echo "n (node version manager tool) not installed, doing test run, install skipped" >>$logfile
+				#	fi
 				fi
 			fi
 		fi
@@ -341,7 +379,7 @@ if [ -d ~/$mfn ]; then
 
 			# Check if a node process is currently running.
 			# If so abort installation.
-			while true
+			while false
 			do
 				node_running=$(ps -ef | grep "node " | grep -v grep)
 				if [ "$node_running." != "." ]; then
@@ -384,7 +422,15 @@ if [ -d ~/$mfn ]; then
 	# Install or upgrade node if necessary.
 	if $NODE_INSTALL; then
 		if [ $doinstalls == $true ]; then
+			t=$(dpkg --print-architecture| grep armhf)
+			echo "architecture from dpkg is $t" >>$logfile
+			ar=
+			if [ "$t." != "." ]; then
+				ar=":armv7l"
+			fi
 			echo -e "\e[96mInstalling Node.js ...\e[0m" | tee -a $logfile
+			nvm_command=$(get_nvm_command "$NODE_TESTED" "$NODE_CURRENT" "$ar")
+			echo using $nvm_command
 			# Fetch the latest version of Node.js from the selected branch
 			# The NODE_STABLE_BRANCH variable will need to be manually adjusted when a new branch is released. (e.g. 7.x)
 			# Only tested (stable) versions are recommended as newer versions could break MagicMirror.
@@ -392,19 +438,13 @@ if [ -d ~/$mfn ]; then
 			  if [ "$(which node)" == "" ]; then 
 			    :		  
 			  fi
-			  if [ "$(which node)" != "" ]; then
-				if [ "$(which n)." == "." ]; then
-					# install it globally
-					echo installing n globally >>$logfile
-					sudo npm i n -g  >>$logfile 2>&1
-				fi
-				# if n is installed
-				if [ "$(which n)." != "." ]; then	
-				   sudo n $NODE_TESTED >>$logfile 2>&1
-				fi
+			  if [ "$(which node)" = "" ]; then
+				   $(eval "$nvm_command") >>$logfile 2>&1
 			  fi
 			  #brew install node
 			else
+				r=eval "$nvm_command"
+				if [ 0 -eq 1 ]; then
 			    sudo apt-get --allow-releaseinfo-change update >>$logfile
 				echo $NODE_STABLE_BRANCH | grep -qE "x$"
 				if [ $? -eq 1 ]; then 
@@ -441,6 +481,7 @@ if [ -d ~/$mfn ]; then
 					cd - >/dev/null
 					rm ./node_release-$node_ver.tar.gz
 				fi
+				fi
 				# get the new node version number
 				new_ver=$(LC_ALL=C node -v 2>&1)
 				# if there is a failure to get it due to a missing library
@@ -454,9 +495,9 @@ if [ -d ~/$mfn ]; then
 			# if pm2 is installed
 			if [ "$(which pm2)." != "." ]; then
 				pm2_npmjs_version=$(npm view pm2 version)
-				pm2_current_version=$(npm list -g --depth=0 | grep -i pm2 | awk -F@ '{print $2}')
+				pm2_current_version=$(pm2 --version)
 				echo pm2 installed, checking version $pm2_current_version vs $pm2_npmjs_version >> $logfile
-				if [ 1 -o  ${pm2_npmjs_version:0:1} == ${pm2_current_version:0:1} -a $pm2_current_version != $pm2_npmjs_version ]; then
+				if [ 1 -eq 1 -o  ${pm2_npmjs_version:0:1} == ${pm2_current_version:0:1} -a $pm2_current_version != $pm2_npmjs_version ]; then
 					# if pm2 is managing MagicMirror,, then update
 					if [ $(pm2 ls -m | grep "\-\-" | grep -i magicmirror | wc -l) -eq 1 ]; then
 						apps_defined=$(pm2 ls -m | grep "\-\-" | wc -l)
@@ -607,17 +648,22 @@ if [ -d ~/$mfn ]; then
 		if [ $NPM_MAJOR -ge 8 ]; then
 			JustProd="--no-audit --no-fund --no-update-notifier"
 		fi
-		if [ $mac != 'Darwin' ]; then
+		if [ $mac != 'Darwin' -a "$OS." != 'trixie' ]; then
 			if [ $(LC_ALL=C free -m | grep Swap | awk '{print $2}') -le 512  ]; then
 				# only for arm architectures
 				if [[ $arch == a* ]]; then
-					export NODE_OPTIONS="--max-old-space-size=1024"
-					echo "increasing swap space" >>$logfile
-					sudo dphys-swapfile swapoff
-					sudo sed '/SWAPSIZE=100/ c \SWAPSIZE=1024' -i /etc/dphys-swapfile
-					#sudo nano /etc/dphys-swapfile
-					sudo dphys-swapfile setup
-					sudo dphys-swapfile swapon
+					if [ -e /etc/dphys-swapfile ]; then
+						echo "increasing swap space" >>$logfile
+						export NODE_OPTIONS="--max-old-space-size=1024"
+						echo "increasing swap space" >>$logfile
+						sudo dphys-swapfile swapoff
+						sudo sed '/SWAPSIZE=100/ c \SWAPSIZE=1024' -i /etc/dphys-swapfile
+						#sudo nano /etc/dphys-swapfile
+						sudo dphys-swapfile setup
+						sudo dphys-swapfile swapon
+					else
+					   echo swap control file /etc/dphys-swapfile doesn\'t exist >>$logfile
+					fi
 				fi
 			fi
 		fi
@@ -676,7 +722,7 @@ if [ -d ~/$mfn ]; then
 		fi
 		remote_user=MagicMirrorOrg
 		# get the git remote name
-		remote=$(LC_ALL=C  git remote -v 2>/dev/null |  grep -m1 '.com/M'  | awk '{print $1}')
+		remote=$(LC_ALL=C  git remote -v 2>/dev/null |  grep -m1 -e '.com/M' -e '.com:M'  | awk '{print $1}')
 		if [ "$remote" == 'upstream' ]; then
 			git remote remove upstream > /dev/null
 			git remote add upstream https://github.com/$remote_user/MagicMirror
@@ -736,10 +782,13 @@ if [ -d ~/$mfn ]; then
 					else
 						mmline=$(LC_ALL=C ps -ef | grep "node " | grep -v grep)
 						if [ "$mmline." != "." ]; then 
-						echo some node app still running, please shutdown MagicMirror and restart 
-						if [ "$switched." != "." ]; then
-							git switch $switched -q >>$logfile
-						fi
+							echo some node app still running, please shutdown those apps, maybe MagicMirror, and restart
+							echo here is a list of those processes
+							echo $mline
+							if [ "$switched." != "." ]; then
+								git switch $switched -q >>$logfile
+							fi
+						date +"Upgrade ended - %a %b %e %H:%M:%S %Z %Y" >>$logfile
 						exit 4
 						fi   
 					fi 

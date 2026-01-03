@@ -46,20 +46,44 @@ if [ 0 -eq 1 ]; then
 	fi
 fi
 logfile=$logdir/browser_over_server.log
-echo install log being saved to $logfile
 
+echo install log being saved to $logfile | tee -a $logfile
+if [ ! -d $HOME/MagicMirror ]; then
+	echo MagicMirror not installed
+	date +"browser over server setup  ending  - %a %b %e %H:%M:%S %Z %Y" >>$logfile
+	exit 2
+fi
 # Determine which Pi is running.
 date +"browser over server setup  starting  - %a %b %e %H:%M:%S %Z %Y" >>$logfile
 	cd $HOME/MagicMirror
 	curl -sL https://raw.githubusercontent.com/sdetweil/MagicMirror_scripts/master/run-start.sh >run-start.sh
 	chmod +x run-start.sh
-  	sed '/start/ c \    "start\"\:\"./run-start.sh $1\",' < package.json 	>new_package.json
+  	sed '/start\"/ c \    "start\"\:\"./run-start.sh $1\",' < package.json 	>new_package.json
 	if [ -e new_package.json ]; then
 		cp new_package.json package.json
 		rm new_package.json
 		echo "package.json update for browser over server, completed ok" >>$logfile
 	else
 		echo "package.json update for browser over server failed " >>$logfile
+	fi
+
+	# if the the pm2 startup script does not exist
+	if [ ! -e mm_script ]; then
+		echo "mm.sh startup script not present" >> $logfile
+		# if we saved the prior
+		if [ -e foo.sh ]; then
+			echo "use saved copy to restore mm.sh" >> $logfile
+			# move it back
+			mv foo.sh installers/mm.sh
+		else
+			# oops didn't save mm.sh or it was lost on prior run
+			echo "oops, was no saved copy of mm.sh, restore from repo" >> $logfile
+			if [ ! -d installers ]; then
+				mkdir installers
+			fi
+			curl -sL https://raw.githubusercontent.com/sdetweil/MagicMirror_scripts/master/mm.sh >installers/mm.sh
+			chmod +x installers/mm.sh
+		fi
 	fi
 
 	echo which browser would you like to use
