@@ -4,6 +4,7 @@ NODE_TESTED="v10.1.0"
 NPM_TESTED="V6.0.0"
 USER=`whoami`
 PM2_FILE=pm2_MagicMirror.json
+App_Name=MagicMirror
 mac=$(uname -s)
 if [ $mac == 'Darwin' ]; then
 	cmd=greadlink
@@ -81,7 +82,7 @@ if [ -d ~/MagicMirror ]; then
 		up=""
 		label="name"
 		if [ $mac == 'Darwin' ]; then
-			 label="App Name"
+			 label="$App_Name"
 			 up="--unsafe-perm"
 			 launchctl=launchctl
 			 launchctl_path=$(which $launchctl)
