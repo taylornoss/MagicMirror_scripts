@@ -972,6 +972,18 @@ if [ -d ~/$mfn ]; then
 										curl -sL https://raw.githubusercontent.com/sdetweil/MagicMirror_scripts/master/mm.sh >installers/mm.sh
 										chmod +x installers/mm.sh
 									fi
+								else    
+									# check  if new MM version is 2.35 or higher with  Wayland  as default for npm start
+										$(verlt  "$remote_version" "2.35" )
+										r=$?
+										if [ $r == 1 ]; then 
+												echo "fixing mm.sh for new Wayland start as default" >> $logfile
+												if [ $mac == 'Darwin' ]; then
+														sed -i ''  's/npm start/npm run start:x11/'  installers/*.sh 
+												else 
+														sed -i  's/npm start/npm run start:x11/'  installers/*.sh 
+												fi
+										fi   
 								fi
 								# if we got here and the saved copy is still around
 								if [ -e foo.sh ]; then
@@ -1293,7 +1305,15 @@ if [ -d ~/$mfn ]; then
 				cp -p save_custom.css custom.css
 				rm save_custom.css
 			fi
+			if [ -d ../defaultmodules ]; then
+				echo moving css contents to config | tee -a $logfile
+				find . -maxdepth 1 \( -not -name "font-awesome.css" -not -name "main.css" -not -name "roboto.css" -not -name "."  \) | xargs -I {}  mv {} ../config				
+			fi
 		cd - >/dev/null
+		if [ -d defaultmodules -a -d modules/default ]; then
+		    rm -rf modules/default >/dev/null 2>&1
+		    echo removing old modules/default folder >> $logfile
+		fi 
 		#if [ "$lang." != "en_US.UTF-8." ]; then
 		   if [ "$save_alias." != "." ]; then
 			    echo restoring git alias >>$logfile
